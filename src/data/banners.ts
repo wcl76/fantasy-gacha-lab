@@ -34,6 +34,20 @@ export const banners: Banner[] = [
     },
   },
   {
+    id: 'banner_004',
+    name: '蛊界群英 · 金运天策 限时 UP',
+    type: 'limited-character',
+    cover: '/banners/gu-reverend-banner.png',
+    startTime: '2026-06-24 00:00:00',
+    endTime: '2026-09-01 00:00:00',
+    upCharacterIds: ['gu_014', 'gu_011', 'gu_012', 'gu_013'],
+    rates: {
+      SSR: 0.02,
+      SR: 0.12,
+      R: 0.86,
+    },
+  },
+  {
     id: 'banner_003',
     name: '常驻召唤',
     type: 'permanent',
