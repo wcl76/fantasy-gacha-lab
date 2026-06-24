@@ -387,7 +387,7 @@ function share() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 7px 6px 8px;
+  padding: 7px 6px 7px;
   overflow: hidden;
 }
 .result-card::before {
@@ -450,11 +450,11 @@ function share() {
 
 .result-portrait {
   position: relative;
-  flex: 1;
+  flex: 0 0 52%;
   width: 100%;
   display: grid;
   place-items: center;
-  margin: 14px 0 6px;
+  margin: 14px 0 5px;
   z-index: 2;
   border-radius: 6px;
   overflow: hidden;
@@ -481,7 +481,7 @@ function share() {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center top;
+  object-position: center 12%;
   filter: saturate(1.08) contrast(1.04);
 }
 .result-emoji {
@@ -517,6 +517,7 @@ function share() {
   position: relative;
   z-index: 2;
   font-size: 12px;
+  line-height: 1.15;
   font-weight: 700;
   color: var(--color-text-bright);
   text-align: center;
@@ -525,6 +526,7 @@ function share() {
   position: relative;
   z-index: 2;
   font-size: 10px;
+  line-height: 1.15;
   color: var(--color-muted);
   text-align: center;
   margin-top: 1px;
@@ -536,21 +538,21 @@ function share() {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 28px;
-  margin: 5px 0 0;
-  padding: 4px 5px;
+  min-height: 24px;
+  margin: 4px 0 0;
+  padding: 3px 5px;
   width: 100%;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.24);
   color: rgba(246, 240, 255, 0.8);
-  font-size: 9px;
-  line-height: 1.35;
+  font-size: 8px;
+  line-height: 1.3;
   text-align: left;
 }
 .result-stars {
   position: relative;
   z-index: 2;
-  margin-top: 4px;
+  margin-top: 3px;
   color: var(--color-ssr);
   font-size: 9px;
   letter-spacing: 1.5px;

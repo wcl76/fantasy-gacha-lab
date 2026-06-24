@@ -220,12 +220,17 @@ const floatOptions: ISourceOptions = {
 .banner-right {
   position: relative;
   display: grid;
-  place-items: center;
+  place-items: stretch end;
+  min-height: 260px;
+  margin: -36px -40px;
+  overflow: hidden;
 }
 .hero-portrait {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: min(460px, 42vw);
+  min-width: 280px;
+  height: 100%;
+  min-height: 260px;
   display: grid;
   place-items: center;
 }
@@ -242,12 +247,13 @@ const floatOptions: ISourceOptions = {
 }
 .hero-image {
   position: absolute;
-  right: -26px;
-  bottom: -44px;
+  inset: 0;
   z-index: 3;
-  width: min(360px, 46vw);
+  width: 100%;
   max-width: none;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 8%;
   filter: drop-shadow(0 0 26px var(--color-ssr-glow)) saturate(1.08) contrast(1.04);
   pointer-events: none;
 }
