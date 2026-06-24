@@ -1,0 +1,151 @@
+/* ============================================
+   Fantasy Gacha Lab 全局样式
+   颜色规范源自规划文档 10.2 + 效果图反推
+   ============================================ */
+
+:root {
+  /* ========== 背景与面板 ========== */
+  --color-bg: #07091a;
+  --color-bg-deep: #04061a;
+  --color-panel: rgba(16, 20, 45, 0.86);
+  --color-panel-deep: rgba(10, 14, 32, 0.92);
+  --color-panel-light: rgba(28, 32, 64, 0.65);
+  --color-border: rgba(155, 108, 255, 0.28);
+  --color-border-soft: rgba(155, 108, 255, 0.15);
+  --color-border-strong: rgba(155, 108, 255, 0.55);
+
+  /* ========== 主题色 ========== */
+  --color-gold: #f6c66b;
+  --color-gold-bright: #ffd98a;
+  --color-gold-deep: #c89a3a;
+  --color-purple: #9b6cff;
+  --color-purple-bright: #b893ff;
+  --color-purple-deep: #6c47cc;
+  --color-blue: #4da3ff;
+  --color-pink: #ff7ad9;
+  --color-pink-bright: #ff9be6;
+
+  /* ========== 文字 ========== */
+  --color-text: #f6f0ff;
+  --color-text-bright: #ffffff;
+  --color-muted: #9ca3c7;
+  --color-dim: #6b7299;
+
+  /* ========== 稀有度 ========== */
+  --color-ssr: #f6c66b;
+  --color-ssr-glow: rgba(246, 198, 107, 0.55);
+  --color-sr: #b893ff;
+  --color-sr-glow: rgba(184, 147, 255, 0.45);
+  --color-r: #4da3ff;
+  --color-r-glow: rgba(77, 163, 255, 0.35);
+
+  /* ========== 字体 ========== */
+  --font-zh: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+  --font-en: 'Inter', 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --font-display: 'Cinzel', 'Trajan Pro', serif;
+
+  /* ========== 阴影 / 发光 ========== */
+  --shadow-glow-gold: 0 0 24px rgba(246, 198, 107, 0.45);
+  --shadow-glow-purple: 0 0 18px rgba(155, 108, 255, 0.4);
+  --shadow-glow-pink: 0 0 20px rgba(255, 122, 217, 0.4);
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* ========== 渐变 ========== */
+  --gradient-gold: linear-gradient(180deg, #ffe4a3 0%, #f6c66b 50%, #b8852a 100%);
+  --gradient-purple: linear-gradient(180deg, #b893ff 0%, #9b6cff 60%, #6c47cc 100%);
+  --gradient-pink: linear-gradient(135deg, #ff7ad9 0%, #ff5fa8 100%);
+  --gradient-panel: linear-gradient(180deg, rgba(28, 32, 64, 0.85) 0%, rgba(16, 20, 45, 0.85) 100%);
+
+  /* ========== 布局尺寸 ========== */
+  --max-width: 1280px;
+  --header-height: 72px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: var(--color-bg-deep);
+  color: var(--color-text);
+  font-family: var(--font-zh);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at top, #1a0f3a 0%, transparent 50%),
+    radial-gradient(ellipse at bottom, #0a1240 0%, transparent 50%),
+    var(--color-bg-deep);
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+a {
+  color: var(--color-purple-bright);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+a:hover {
+  color: var(--color-gold-bright);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--color-purple);
+  color: var(--color-text-bright);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-purple-deep);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-purple);
+}
+
+/* 通用工具类 */
+.text-gold { color: var(--color-gold); }
+.text-purple { color: var(--color-purple); }
+.text-pink { color: var(--color-pink); }
+.text-muted { color: var(--color-muted); }
+.text-bright { color: var(--color-text-bright); }
+
+/* 通用面板 */
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
