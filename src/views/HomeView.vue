@@ -9,9 +9,10 @@ import { useGachaStore } from '@/stores/gachaStore'
 import { charactersById } from '@/data/characters'
 import GachaBanner from '@/components/gacha/GachaBanner.vue'
 import DrawButton from '@/components/gacha/DrawButton.vue'
+import CharacterModal from '@/components/gacha/CharacterModal.vue'
 import { formatNumber, formatPercent } from '@/utils/format'
 import { dailyTasks } from '@/data/dailyTasks'
-import type { Currency } from '@/types'
+import type { Character, Currency } from '@/types'
 import { playClaim } from '@/utils/sound'
 
 const router = useRouter()
@@ -27,6 +28,21 @@ const hotCharacters = computed(() => {
   // 展示前 5 个 SSR + 部分 SR
   return store.characters.filter(c => c.rarity === 'SSR' || c.rarity === 'SR').slice(0, 6)
 })
+
+const selectedCharacter = ref<Character | null>(null)
+
+function characterImageSrc(character: Character): string {
+  const base = import.meta.env.BASE_URL || '/'
+  return `${base.replace(/\/+$/, '')}${character.image}`
+}
+
+function openCharacter(character: Character) {
+  selectedCharacter.value = character
+}
+
+function closeCharacter() {
+  selectedCharacter.value = null
+}
 
 const tasks = computed(() => {
   store.checkDailyReset()
@@ -182,19 +198,39 @@ const unclaimedEventCount = computed(() => {
       </div>
       <div class="hot-grid">
         <div v-for="c in hotCharacters" :key="c.id" class="hot-slot">
-          <div class="hot-card" :class="`rarity-${c.rarity.toLowerCase()}`">
+          <button
+            class="hot-card"
+            :class="`rarity-${c.rarity.toLowerCase()}`"
+            type="button"
+            :aria-label="`查看${c.name}角色详情`"
+            @click="openCharacter(c)"
+          >
             <div class="hot-glow" />
             <div class="hot-portrait">
+              <img
+                class="hot-image"
+                :src="characterImageSrc(c)"
+                :alt="`${c.name} ${c.title}`"
+                loading="lazy"
+                @error="($event.target as HTMLImageElement).style.display = 'none'"
+              >
               <div class="hot-initials">{{ c.name.charAt(0) }}</div>
             </div>
             <div class="hot-info">
               <div class="hot-name">{{ c.name }}</div>
               <div class="hot-rarity">{{ c.rarity }}</div>
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </section>
+
+    <CharacterModal
+      :character="selectedCharacter"
+      :obtained="selectedCharacter ? (store.collection[selectedCharacter.id] ?? 0) > 0 : false"
+      :count="selectedCharacter ? (store.collection[selectedCharacter.id] ?? 0) : 0"
+      @close="closeCharacter"
+    />
   </div>
 </template>
 
@@ -467,6 +503,7 @@ const unclaimedEventCount = computed(() => {
 .hot-card {
   position: relative;
   width: 100%; height: 100%;
+  padding: 0;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: linear-gradient(180deg, rgba(20, 24, 50, 0.85) 0%, rgba(8, 10, 28, 0.95) 100%);
@@ -475,6 +512,10 @@ const unclaimedEventCount = computed(() => {
   cursor: pointer;
 }
 .hot-card:hover { transform: translateY(-4px); }
+.hot-card:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 4px;
+}
 .hot-card.rarity-ssr { border-color: var(--color-ssr); box-shadow: 0 0 14px var(--color-ssr-glow); }
 .hot-card.rarity-sr  { border-color: var(--color-sr);  box-shadow: 0 0 10px var(--color-sr-glow); }
 .hot-glow {
@@ -489,7 +530,23 @@ const unclaimedEventCount = computed(() => {
   display: grid;
   place-items: center;
 }
+.hot-image {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 12%;
+  filter: saturate(1.08) contrast(1.04);
+  transition: transform 0.3s ease;
+}
+.hot-card:hover .hot-image {
+  transform: scale(1.05);
+}
 .hot-initials {
+  position: relative;
+  z-index: 1;
   font-size: 48px;
   font-weight: 800;
   font-family: var(--font-display);
@@ -506,6 +563,7 @@ const unclaimedEventCount = computed(() => {
 }
 .hot-info {
   position: absolute;
+  z-index: 3;
   bottom: 0; left: 0; right: 0;
   padding: 8px 10px;
   background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.85));

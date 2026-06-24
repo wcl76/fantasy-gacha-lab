@@ -25,7 +25,8 @@ const navItems: NavItem[] = [
 const activeName = computed(() => route.name as string)
 
 function go(name: string) {
-  router.push({ name })
+  if (activeName.value === name) return
+  router.push({ name }).catch(() => {})
 }
 </script>
 

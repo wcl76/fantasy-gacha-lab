@@ -5,7 +5,7 @@
  * - 大立绘 + 完整属性 + 故事背景
  * - 收藏状态：已获得/未获得
  */
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Character } from '@/types'
 import { ELEMENT_NAME_CN, ROLE_NAME_CN } from '@/utils/format'
 import { charactersById } from '@/data/characters'
@@ -19,6 +19,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
 }>()
+
+const previewOpen = ref(false)
 
 /** 图片路径拼接 base URL */
 const imageSrc = computed(() => {
@@ -42,10 +44,19 @@ const sameRarityChars = computed(() => {
 
 // ESC 关闭
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
+  if (e.key !== 'Escape') return
+  if (previewOpen.value) {
+    previewOpen.value = false
+    return
+  }
+  emit('close')
 }
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+
+watch(() => props.character?.id, () => {
+  previewOpen.value = false
+})
 
 // 星星数量
 const stars = computed(() => {
@@ -55,6 +66,14 @@ const stars = computed(() => {
 
 function close() {
   emit('close')
+}
+
+function openPreview() {
+  previewOpen.value = true
+}
+
+function closePreview() {
+  previewOpen.value = false
 }
 </script>
 
@@ -71,7 +90,12 @@ function close() {
         <div class="modal-body">
           <!-- 左侧：大立绘 + 稀有度徽章 -->
           <div class="modal-left">
-            <div class="portrait-stage">
+            <button
+              class="portrait-stage"
+              type="button"
+              :aria-label="`查看${character.name}完整立绘`"
+              @click="openPreview"
+            >
               <div class="portrait-glow" />
               <img
                 class="portrait-image"
@@ -81,7 +105,8 @@ function close() {
               >
               <div class="portrait-emoji">{{ elementEmoji[character.element] }}</div>
               <div class="portrait-initials">{{ character.name.charAt(0) }}</div>
-            </div>
+              <span class="portrait-zoom">⌕</span>
+            </button>
             <div class="portrait-rarity">{{ character.rarity }}</div>
             <div v-if="obtained" class="portrait-check">✓ 已收藏</div>
             <div v-else class="portrait-locked">🔒 未获得</div>
@@ -165,6 +190,17 @@ function close() {
           </div>
         </div>
       </div>
+
+      <Transition name="preview">
+        <div v-if="previewOpen" class="image-preview" @click.self="closePreview">
+          <button class="preview-close" @click="closePreview">✕</button>
+          <img
+            class="preview-image"
+            :src="imageSrc"
+            :alt="`${character.name} ${character.title} 完整立绘`"
+          >
+        </div>
+      </Transition>
     </div>
   </Transition>
 </template>
@@ -247,8 +283,19 @@ function close() {
   height: 200px;
   display: grid;
   place-items: center;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   overflow: hidden;
+  background: transparent;
+  cursor: zoom-in;
+}
+.portrait-stage:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 4px;
+}
+.portrait-stage:hover .portrait-image {
+  transform: scale(1.05);
 }
 .portrait-glow {
   position: absolute;
@@ -274,6 +321,7 @@ function close() {
   object-position: center top;
   border-radius: 50%;
   filter: saturate(1.08) contrast(1.04);
+  transition: transform 0.25s ease;
 }
 .portrait-emoji {
   position: absolute;
@@ -292,6 +340,23 @@ function close() {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-shadow: 0 0 32px var(--color-ssr-glow);
+}
+.portrait-zoom {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(8, 10, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: var(--color-text-bright);
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.36);
 }
 .rarity-sr .portrait-initials {
   background: var(--gradient-purple);
@@ -468,6 +533,43 @@ function close() {
 .rarity-sr.related-item { border-color: var(--color-sr); }
 .related-emoji { font-size: 12px; }
 
+/* 完整立绘预览 */
+.image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 520;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.preview-image {
+  width: min(92vw, 720px);
+  height: min(88vh, 920px);
+  object-fit: contain;
+  filter: drop-shadow(0 0 26px rgba(246, 198, 107, 0.24));
+}
+.preview-close {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-soft);
+  color: var(--color-text-bright);
+  font-size: 20px;
+  cursor: pointer;
+}
+.preview-close:hover {
+  background: var(--color-pink);
+  color: #fff;
+}
+
 /* 过渡 */
 .modal-enter-active, .modal-leave-active {
   transition: opacity 0.3s;
@@ -480,4 +582,21 @@ function close() {
 .modal-enter-from .modal-container { transform: scale(0.92); opacity: 0; }
 .modal-leave-to { opacity: 0; }
 .modal-leave-to .modal-container { transform: scale(0.96); opacity: 0; }
+
+.preview-enter-active, .preview-leave-active {
+  transition: opacity 0.22s ease;
+}
+.preview-enter-active .preview-image,
+.preview-leave-active .preview-image {
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.preview-enter-from,
+.preview-leave-to {
+  opacity: 0;
+}
+.preview-enter-from .preview-image,
+.preview-leave-to .preview-image {
+  transform: scale(0.96);
+  opacity: 0;
+}
 </style>

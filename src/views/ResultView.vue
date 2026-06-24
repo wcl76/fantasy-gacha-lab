@@ -5,7 +5,7 @@
  * 翻牌动画：GSAP timeline 编排 10 张卡依次翻面，SSR 卡翻面时触发粒子爆发
  */
 import gsap from 'gsap'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGachaStore } from '@/stores/gachaStore'
 import { charactersById } from '@/data/characters'
@@ -27,6 +27,8 @@ const ssrBurstTrigger = ref<number>(0)
 const ssrFlashRef = ref<InstanceType<typeof SSRGoldFlash> | null>(null)
 const titleRef = ref<HTMLElement | null>(null)
 const footerRef = ref<HTMLElement | null>(null)
+const selectedResultIndex = ref<number | null>(null)
+let timelineRunId = 0
 
 // 保存 setTimeout 句柄，便于取消
 const pendingTimers = ref<number[]>([])
@@ -34,6 +36,39 @@ const pendingTimers = ref<number[]>([])
 function clearPendingTimers() {
   pendingTimers.value.forEach(id => clearTimeout(id))
   pendingTimers.value = []
+}
+
+function hideOverlays() {
+  selectedResultIndex.value = null
+}
+
+function resetTimeline() {
+  timelineRunId++
+  clearPendingTimers()
+  if (mainTimeline) {
+    mainTimeline.kill()
+    mainTimeline = null
+  }
+}
+
+function revealCard(index: number) {
+  const next = [...flipped.value]
+  next[index] = true
+  flipped.value = next
+}
+
+function triggerRarityEffects(rarity: 'SSR' | 'SR' | 'R') {
+  try {
+    if (rarity === 'SSR') {
+      ssrBurstTrigger.value++
+      if (ssrFlashRef.value) ssrFlashRef.value.flash()
+    }
+    if (store.settings.soundEnabled) {
+      playRarity(rarity)
+    }
+  } catch (error) {
+    console.warn('Rarity effect failed:', error)
+  }
 }
 
 /** 主时间轴（用于清理和防重复） */
@@ -44,17 +79,9 @@ function runTimeline() {
   if (!result.value) return
 
   // 取消之前未触发的 setTimeout + 时间轴（避免快速连抽时混乱）
-  clearPendingTimers()
-  if (mainTimeline) {
-    mainTimeline.kill()
-    mainTimeline = null
-  }
-
-  // 0. 结果卡片整体初始状态：缩小 + 透明（翻面前）
-  const cardSlots = document.querySelectorAll('.result-card-slot')
-  if (cardSlots.length > 0) {
-    gsap.set(cardSlots, { opacity: 0, y: 30, scale: 0.7 })
-  }
+  resetTimeline()
+  hideOverlays()
+  const runId = timelineRunId
 
   // 1. 标题入场（淡入 + 上滑）
   if (titleRef.value) {
@@ -66,11 +93,18 @@ function runTimeline() {
 
   // 2. 10 张卡依次翻面（用 GSAP Timeline 替代 setTimeout，更可靠）
   flipped.value = new Array(result.value.results.length).fill(false)
+  const currentResults = result.value.results
   // 等 nextTick 让 v-for 渲染 FlipCard
   nextTick(() => {
+    if (runId !== timelineRunId || !result.value) return
+    const cardSlots = document.querySelectorAll('.result-card-slot')
+    if (cardSlots.length > 0) {
+      gsap.set(cardSlots, { opacity: 0, y: 30, scale: 0.7 })
+    }
+
     const tl = gsap.timeline()
     mainTimeline = tl
-    result.value!.results.forEach((item, idx) => {
+    currentResults.forEach((item, idx) => {
       const entryDelay = 0.3 + idx * 0.1
       const flipDelay = entryDelay + 0.4
 
@@ -85,21 +119,17 @@ function runTimeline() {
         }, entryDelay)
       }
 
-      // 翻面（用 call 在 timeline 中插入回调）
-      tl.call(() => {
-        flipped.value[idx] = true
-        if (item.rarity === 'SSR') {
-          ssrBurstTrigger.value++
-          if (ssrFlashRef.value) ssrFlashRef.value.flash()
-        }
-        if (store.settings.soundEnabled) {
-          playRarity(item.rarity)
-        }
-      }, [], flipDelay)
+      // 翻面用独立 timer，避免 SSR 特效影响后续卡牌继续翻开。
+      const flipTimer = window.setTimeout(() => {
+        if (runId !== timelineRunId) return
+        revealCard(idx)
+        triggerRarityEffects(item.rarity)
+      }, flipDelay * 1000)
+      pendingTimers.value.push(flipTimer)
     })
 
     // 3. 底部三块整体入场
-    const footerDelay = 0.3 + result.value!.results.length * 0.1 + 0.6
+    const footerDelay = 0.3 + currentResults.length * 0.1 + 0.6
     if (footerRef.value) {
       tl.fromTo(footerRef.value,
         { opacity: 0, y: 20 },
@@ -115,8 +145,15 @@ watch(result, (newVal) => {
     nextTick(() => runTimeline())
   } else {
     flipped.value = []
+    resetTimeline()
+    hideOverlays()
   }
 }, { immediate: true })
+
+onBeforeUnmount(() => {
+  resetTimeline()
+  hideOverlays()
+})
 
 const enriched = computed(() => {
   if (!result.value) return []
@@ -147,14 +184,38 @@ const luckComment = computed(() => {
 })
 
 const pityLeft = computed(() => PITY_LIMIT - store.currentPity)
+const activeDetailIndex = computed(() => selectedResultIndex.value)
+const activeDetail = computed(() => {
+  const idx = activeDetailIndex.value
+  if (idx === null) return null
+  return enriched.value[idx] ?? null
+})
+
+function resultImageSrc(character: { image: string }): string {
+  const base = import.meta.env.BASE_URL || '/'
+  if (character.image.startsWith(base)) return character.image
+  return `${base.replace(/\/+$/, '')}${character.image}`
+}
+
+function openResultDetail(index: number) {
+  selectedResultIndex.value = index
+}
+
+function closeResultDetail() {
+  selectedResultIndex.value = null
+}
 
 function redrawTen() {
+  hideOverlays()
   store.performTenDraw()
 }
 function goSummon() {
+  resetTimeline()
+  hideOverlays()
   router.push({ name: 'summon' })
 }
 function share() {
+  hideOverlays()
   if (navigator.share) {
     navigator.share({
       title: '幻想召唤研究所',
@@ -203,14 +264,21 @@ function share() {
             :delay="0"
             :duration="0.65"
           >
-            <div class="result-card" :class="`rarity-${r.rarity.toLowerCase()}`">
+            <button
+              class="result-card"
+              :class="`rarity-${r.rarity.toLowerCase()}`"
+              type="button"
+              :disabled="!(flipped[idx] ?? false)"
+              :aria-label="`查看${r.character.name}召唤结果详情`"
+              @click="openResultDetail(idx)"
+            >
               <div v-if="r.isNew" class="new-badge">NEW!</div>
               <div class="rarity-badge">{{ r.rarity }}</div>
               <div class="result-portrait">
                 <div class="result-glow" />
                 <img
                   class="result-image"
-                  :src="r.character.image.startsWith('/fantasy-gacha-lab/') ? r.character.image : `/fantasy-gacha-lab${r.character.image}`"
+                  :src="resultImageSrc(r.character)"
                   :alt="`${r.character.name} ${r.character.title}`"
                   loading="lazy"
                   @error="($event.target as HTMLImageElement).style.display = 'none'"
@@ -231,7 +299,7 @@ function share() {
               <div class="result-stars">
                 <span v-for="i in ({SSR: 5, SR: 4, R: 3})[r.rarity]" :key="i" class="star">★</span>
               </div>
-            </div>
+            </button>
           </FlipCard>
         </div>
       </div>
@@ -291,6 +359,44 @@ function share() {
       <p class="result-tip">
         小贴士：重复获得的角色将自动转化为对应星灵碎片，可在图鉴中查看 ⓘ
       </p>
+
+      <div
+        v-if="activeDetail"
+        class="card-detail-mask"
+        :class="{ 'ssr-showcase': activeDetail.rarity === 'SSR' }"
+        @click.self="closeResultDetail"
+      >
+        <div class="detail-aura" />
+        <button
+          class="detail-close"
+          type="button"
+          @click="closeResultDetail"
+        >
+          ✕
+        </button>
+        <div class="detail-card-shell" :class="`rarity-${activeDetail.rarity.toLowerCase()}`">
+          <div v-if="activeDetail.rarity === 'SSR'" class="gold-rays" />
+          <div v-if="activeDetail.rarity === 'SSR'" class="gold-sweep" />
+          <div class="detail-card" :class="`rarity-${activeDetail.rarity.toLowerCase()}`">
+            <div v-if="activeDetail.isNew" class="detail-new">NEW!</div>
+            <div class="detail-rarity">{{ activeDetail.rarity }}</div>
+            <div class="detail-portrait">
+              <img
+                class="detail-image"
+                :src="resultImageSrc(activeDetail.character)"
+                :alt="`${activeDetail.character.name} ${activeDetail.character.title}`"
+              >
+            </div>
+            <div class="detail-name">{{ activeDetail.character.name }}</div>
+            <div class="detail-title">{{ activeDetail.character.title }}</div>
+            <p class="detail-desc">{{ activeDetail.character.description }}</p>
+            <div class="detail-stars">
+              <span v-for="i in ({SSR: 5, SR: 4, R: 3})[activeDetail.rarity]" :key="i">★</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </template>
   </div>
 </template>
@@ -379,6 +485,8 @@ function share() {
   position: relative;
   width: 100%;
   height: 100%;
+  cursor: pointer;
+  color: inherit;
   border-radius: var(--radius-md);
   background:
     linear-gradient(145deg, rgba(255,255,255,0.14), transparent 24%),
@@ -389,6 +497,22 @@ function share() {
   align-items: center;
   padding: 7px 6px 7px;
   overflow: hidden;
+  transition: transform 0.2s, filter 0.2s;
+}
+.result-card:disabled {
+  cursor: default;
+}
+.result-card:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.08);
+}
+.result-card:disabled:hover {
+  transform: none;
+  filter: none;
+}
+.result-card:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
 }
 .result-card::before {
   content: '';
@@ -739,5 +863,239 @@ function share() {
   color: var(--color-muted);
   font-style: italic;
   margin: 0;
+}
+
+/* 居中卡牌详情 */
+.card-detail-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 540;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.detail-aura {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at center, rgba(246, 198, 107, 0.26) 0%, transparent 30%),
+    radial-gradient(circle at 50% 48%, rgba(255, 244, 184, 0.22) 0%, transparent 16%);
+  opacity: 0;
+}
+.ssr-showcase .detail-aura {
+  animation: detail-aura-pulse 1.25s ease-in-out infinite;
+}
+@keyframes detail-aura-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.detail-close {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-soft);
+  color: var(--color-text-bright);
+  font-size: 20px;
+  cursor: pointer;
+}
+.detail-close:hover {
+  background: var(--color-pink);
+  color: #fff;
+}
+.detail-card-shell {
+  position: relative;
+  width: min(72vw, 330px);
+  aspect-ratio: 3/4.2;
+  filter: drop-shadow(0 24px 44px rgba(0, 0, 0, 0.55));
+}
+.detail-card-shell.rarity-ssr {
+  filter:
+    drop-shadow(0 0 22px rgba(246, 198, 107, 0.74))
+    drop-shadow(0 28px 48px rgba(0, 0, 0, 0.6));
+}
+.detail-card {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 14px 16px;
+  border-radius: 10px;
+  border: 3px solid var(--color-border);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,0.16), transparent 24%),
+    linear-gradient(180deg, rgba(20, 24, 50, 0.96), rgba(8, 10, 28, 0.98));
+}
+.detail-card.rarity-ssr {
+  border-color: var(--color-ssr);
+  background:
+    radial-gradient(circle at 20% 8%, rgba(255, 244, 184, 0.35), transparent 28%),
+    linear-gradient(160deg, #6b3d0c 0%, #f6c66b 17%, #3a1d07 38%, #111028 72%, #7d4c12 100%);
+}
+.detail-card.rarity-sr {
+  border-color: var(--color-sr);
+  background:
+    radial-gradient(circle at 20% 8%, rgba(229, 193, 255, 0.28), transparent 28%),
+    linear-gradient(160deg, #3b1b62 0%, #b48cff 18%, #20143f 42%, #0d0c26 76%, #7c4ac4 100%);
+}
+.detail-card.rarity-r {
+  border-color: var(--color-r);
+  background:
+    radial-gradient(circle at 20% 8%, rgba(142, 197, 255, 0.22), transparent 28%),
+    linear-gradient(160deg, #15365d 0%, #6fb7ff 18%, #102540 42%, #080f22 76%, #336a99 100%);
+}
+.detail-card::before {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  z-index: 1;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+}
+.gold-rays {
+  position: absolute;
+  inset: -38%;
+  z-index: 0;
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      rgba(246, 198, 107, 0.56) 14deg,
+      transparent 28deg,
+      transparent 54deg,
+      rgba(255, 244, 184, 0.48) 72deg,
+      transparent 90deg
+    );
+  filter: blur(8px);
+  animation: gold-rays-spin 6s linear infinite;
+}
+@keyframes gold-rays-spin {
+  to { transform: rotate(360deg); }
+}
+.gold-sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.gold-sweep::after {
+  content: '';
+  position: absolute;
+  top: -30%;
+  bottom: -30%;
+  left: -70%;
+  width: 46%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.85), rgba(246,198,107,0.42), transparent);
+  transform: rotate(18deg);
+  animation: gold-sweep 1.15s ease-in-out infinite;
+}
+@keyframes gold-sweep {
+  0% { left: -78%; opacity: 0; }
+  20% { opacity: 1; }
+  100% { left: 132%; opacity: 0; }
+}
+.detail-new,
+.detail-rarity {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+.detail-new {
+  right: 10px;
+  color: #fff;
+  background: var(--gradient-pink);
+}
+.detail-rarity {
+  left: 10px;
+  color: #1a0f2e;
+  background: var(--color-ssr);
+}
+.rarity-sr .detail-rarity { background: var(--color-sr); }
+.rarity-r .detail-rarity { background: var(--color-r); color: #04132e; }
+.detail-portrait {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 58%;
+  width: 100%;
+  margin: 18px 0 10px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(5, 7, 20, 0.55);
+}
+.detail-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 10%;
+  filter: saturate(1.1) contrast(1.04);
+}
+.detail-name,
+.detail-title,
+.detail-desc,
+.detail-stars {
+  position: relative;
+  z-index: 2;
+}
+.detail-name {
+  color: var(--color-text-bright);
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 900;
+  text-align: center;
+}
+.detail-title {
+  margin-top: 3px;
+  color: var(--color-gold-bright);
+  font-size: 13px;
+  text-align: center;
+}
+.detail-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  width: 100%;
+  min-height: 42px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+  color: rgba(246, 240, 255, 0.86);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.detail-stars {
+  margin-top: 8px;
+  color: var(--color-ssr);
+  font-size: 13px;
+  letter-spacing: 3px;
+}
+.rarity-sr .detail-stars { color: var(--color-sr); }
+.rarity-r .detail-stars { color: var(--color-r); }
+@media (max-width: 700px) {
+  .detail-card-shell {
+    width: min(86vw, 310px);
+  }
 }
 </style>

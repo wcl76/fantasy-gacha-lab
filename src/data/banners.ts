@@ -40,7 +40,7 @@ export const banners: Banner[] = [
     cover: '/banners/gu-reverend-banner.png',
     startTime: '2026-06-24 00:00:00',
     endTime: '2026-09-01 00:00:00',
-    upCharacterIds: ['gu_014', 'gu_011', 'gu_012', 'gu_013'],
+    upCharacterIds: ['gu_014', 'gu_015', 'gu_016', 'gu_017', 'gu_018', 'gu_011', 'gu_012', 'gu_013'],
     rates: {
       SSR: 0.02,
       SR: 0.12,

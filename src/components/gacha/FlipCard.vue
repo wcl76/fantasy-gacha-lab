@@ -42,7 +42,11 @@ function flip(toFlipped: boolean) {
   })
   // 翻到卡面时：翻牌音效
   if (toFlipped && store.settings.soundEnabled) {
-    playFlip()
+    try {
+      playFlip()
+    } catch (error) {
+      console.warn('Flip sound failed:', error)
+    }
   }
   if (toFlipped && backRef.value && frontRef.value) {
     // 关键：子级也同步旋转 0 -> 180，**抵消父级**让内容正向显示
