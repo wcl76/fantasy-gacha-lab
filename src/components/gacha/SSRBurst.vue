@@ -123,4 +123,7 @@ onBeforeUnmount(() => { ready.value = false })
 .ssr-burst-wrap :deep(.tsparticles-bg) {
   z-index: 200;
 }
+.ssr-burst-wrap :deep(canvas) {
+  pointer-events: none !important;
+}
 </style>

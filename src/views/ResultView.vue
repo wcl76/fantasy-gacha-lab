@@ -12,8 +12,6 @@ import { charactersById } from '@/data/characters'
 import { formatPercent } from '@/utils/format'
 import { PITY_LIMIT } from '@/utils/gacha'
 import FlipCard from '@/components/gacha/FlipCard.vue'
-import SSRBurst from '@/components/gacha/SSRBurst.vue'
-import SSRGoldFlash from '@/components/gacha/SSRGoldFlash.vue'
 import { playRarity } from '@/utils/sound'
 
 const router = useRouter()
@@ -23,12 +21,12 @@ const result = computed(() => store.lastResult)
 
 // 翻牌状态：每个卡独立 flipped
 const flipped = ref<boolean[]>([])
-const ssrBurstTrigger = ref<number>(0)
-const ssrFlashRef = ref<InstanceType<typeof SSRGoldFlash> | null>(null)
 const titleRef = ref<HTMLElement | null>(null)
 const footerRef = ref<HTMLElement | null>(null)
 const selectedResultIndex = ref<number | null>(null)
 let timelineRunId = 0
+const CARD_FLIP_DURATION = 0.65
+const RARITY_EFFECT_DELAY_MS = Math.round(CARD_FLIP_DURATION * 1000 * 0.62)
 
 // 保存 setTimeout 句柄，便于取消
 const pendingTimers = ref<number[]>([])
@@ -59,10 +57,6 @@ function revealCard(index: number) {
 
 function triggerRarityEffects(rarity: 'SSR' | 'SR' | 'R') {
   try {
-    if (rarity === 'SSR') {
-      ssrBurstTrigger.value++
-      if (ssrFlashRef.value) ssrFlashRef.value.flash()
-    }
     if (store.settings.soundEnabled) {
       playRarity(rarity)
     }
@@ -123,7 +117,11 @@ function runTimeline() {
       const flipTimer = window.setTimeout(() => {
         if (runId !== timelineRunId) return
         revealCard(idx)
-        triggerRarityEffects(item.rarity)
+        const effectTimer = window.setTimeout(() => {
+          if (runId !== timelineRunId) return
+          triggerRarityEffects(item.rarity)
+        }, RARITY_EFFECT_DELAY_MS)
+        pendingTimers.value.push(effectTimer)
       }, flipDelay * 1000)
       pendingTimers.value.push(flipTimer)
     })
@@ -231,11 +229,6 @@ function share() {
 
 <template>
   <div class="result-view">
-    <!-- SSR 出货特效层 -->
-    <SSRBurst :trigger="ssrBurstTrigger" :enabled="true" />
-    <!-- SSR 全屏金色脉冲 -->
-    <SSRGoldFlash ref="ssrFlashRef" />
-
     <div v-if="!result" class="empty panel">
       <h2>暂无召唤结果</h2>
       <p>请先到召唤页进行抽卡</p>
@@ -262,7 +255,7 @@ function share() {
             :flipped="flipped[idx] ?? false"
             :face-class="`rarity-${r.rarity.toLowerCase()}`"
             :delay="0"
-            :duration="0.65"
+            :duration="CARD_FLIP_DURATION"
           >
             <button
               class="result-card"

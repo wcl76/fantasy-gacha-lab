@@ -6,7 +6,7 @@
  * - 卡背/卡面 opacity 切换，避免 backface-visibility 与 GSAP matrix 冲突
  */
 import gsap from 'gsap'
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useGachaStore } from '@/stores/gachaStore'
 import { playFlip } from '@/utils/sound'
 
@@ -29,8 +29,14 @@ const innerRef = ref<HTMLElement | null>(null)
 const backRef = ref<HTMLElement | null>(null)
 const frontRef = ref<HTMLElement | null>(null)
 
+function activeElements(): HTMLElement[] {
+  return [innerRef.value, backRef.value, frontRef.value].filter((el): el is HTMLElement => !!el)
+}
+
 function flip(toFlipped: boolean) {
   if (!innerRef.value) return
+  const elements = activeElements()
+  gsap.killTweensOf(elements)
   const target = toFlipped ? 180 : 0
   // 父级整体翻转 0 -> 180（这是用户感知到的 3D 翻牌）
   gsap.to(innerRef.value, {
@@ -39,6 +45,16 @@ function flip(toFlipped: boolean) {
     delay: props.delay,
     ease: toFlipped ? 'power2.out' : 'power2.in',
     transformOrigin: 'center center',
+    onComplete: () => {
+      if (!innerRef.value || !backRef.value || !frontRef.value) return
+      gsap.set(innerRef.value, { rotateY: target })
+      gsap.set(backRef.value, { opacity: toFlipped ? 0 : 1 })
+      gsap.set(frontRef.value, {
+        opacity: toFlipped ? 1 : 0,
+        rotateY: toFlipped ? 180 : 0,
+        scale: 1,
+      })
+    },
   })
   // 翻到卡面时：翻牌音效
   if (toFlipped && store.settings.soundEnabled) {
@@ -95,9 +111,14 @@ onMounted(() => {
   gsap.set(innerRef.value, { rotateY: 0 })
   if (frontRef.value) gsap.set(frontRef.value, { rotateY: 0, opacity: 0 })
   if (backRef.value) gsap.set(backRef.value, { opacity: 1 })
+  if (props.flipped) flip(true)
 })
 
 watch(() => props.flipped, (v) => flip(v))
+
+onBeforeUnmount(() => {
+  gsap.killTweensOf(activeElements())
+})
 </script>
 
 <template>
