@@ -48,6 +48,20 @@ export const banners: Banner[] = [
     },
   },
   {
+    id: 'banner_005',
+    name: '海虎群雄 · 磁场武神 限时 UP',
+    type: 'limited-character',
+    cover: '/banners/haihu-banner.png',
+    startTime: '2026-06-25 00:00:00',
+    endTime: '2026-09-15 00:00:00',
+    upCharacterIds: ['haihu_001', 'haihu_003', 'haihu_004', 'haihu_012', 'haihu_013'],
+    rates: {
+      SSR: 0.02,
+      SR: 0.12,
+      R: 0.86,
+    },
+  },
+  {
     id: 'banner_003',
     name: '常驻召唤',
     type: 'permanent',

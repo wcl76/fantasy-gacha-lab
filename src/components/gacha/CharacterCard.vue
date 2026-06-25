@@ -37,6 +37,8 @@ const themeName: Record<string, string> = {
   'storm-vanguard': '雷鸣先锋',
   'frost-tide': '霜潮回响',
   'novice-guard': '见习卫队',
+  'gu-reverend': '蛊真人主题',
+  'haihu': '海虎主题',
 }
 
 // 元素对应的 emoji 装饰（占位用）

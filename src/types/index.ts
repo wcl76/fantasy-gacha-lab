@@ -18,6 +18,7 @@ export type CharacterTheme =
   | 'frost-tide'
   | 'novice-guard'
   | 'gu-reverend'
+  | 'haihu'
 
 export type BannerType = 'limited-character' | 'limited-weapon' | 'permanent'
 
